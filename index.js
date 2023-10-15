@@ -11,6 +11,8 @@ module.exports = (req, res) => {
         res.status(500).send('Internal Server Error');
       }
     });
+  } else if (req.method === 'GET') {
+    res.status(200).send('This endpoint only supports POST requests.');
   } else {
     res.status(405).send('Method Not Allowed');
   }
