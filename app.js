@@ -25,11 +25,14 @@ client.on('ready', () => {
 client.login(process.env.DISCORD_BOT_TOKEN);
 
 handler.on('pull_request', function (event) {
+  console.log('Received pull_request event:', event);
   const pr = event.payload.pull_request;
   const message = `New pull request opened: ${pr.title} by ${pr.user.login}\n${pr.html_url}`;
   const channel = client.channels.cache.get(process.env.DISCORD_CHANNEL_ID);
   if (channel) {
-    channel.send(message);
+    channel.send(message)
+      .then(() => console.log('Message sent successfully'))
+      .catch((error) => console.error('Error sending message:', error));
   } else {
     console.error('The channel does not exist!');
   }
