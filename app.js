@@ -1,39 +1,94 @@
-const Discord = require('discord.js');
-const client = new Discord.Client();
-const githubWebhookHandler = require('github-webhook-handler');
-const handler = githubWebhookHandler({ path: '/api/webhook', secret: process.env.GITHUB_WEBHOOK_SECRET });
+require("dotenv").config();
 
-module.exports = (req, res) => {
-  if (req.method === 'POST') {
-    handler(req, res, function (err) {
-      if (err) {
-        console.error('Error in handling GitHub webhook:', err.message);
-        res.status(500).send('Internal Server Error');
-      }
-    });
-  } else if (req.method === 'GET') {
-    res.status(200).send('This endpoint only supports POST requests.');
-  } else {
-    res.status(405).send('Method Not Allowed');
-  }
-};
+const { Client, Intents } = require("discord.js");
+const express = require("express");
 
-client.on('ready', () => {
+const app = express();
+
+app.use(express.json());
+
+const client = new Client({
+  intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES],
+});
+
+client.on("ready", () => {
   console.log(`Logged in as ${client.user.tag}!`);
 });
 
 client.login(process.env.DISCORD_BOT_TOKEN);
 
-handler.on('pull_request', function (event) {
-  console.log('Received pull_request event:', event);
-  const pr = event.payload.pull_request;
-  const message = `New pull request opened: ${pr.title} by ${pr.user.login}\n${pr.html_url}`;
+let messageID;
+
+app.get("/", (req, res) => {
   const channel = client.channels.cache.get(process.env.DISCORD_CHANNEL_ID);
   if (channel) {
-    channel.send(message)
-      .then(() => console.log('Message sent successfully'))
-      .catch((error) => console.error('Error sending message:', error));
+    console.log("test");
+    res.status(200).send("Sent a test message to Discord!");
   } else {
-    console.error('The channel does not exist!');
+    console.error("The channel does not exist!");
+    res.status(500).send("Internal Server Error");
   }
 });
+
+app.post("/", (req, res) => {
+  const event = req.body;
+  const channel = client.channels.cache.get(process.env.DISCORD_CHANNEL_ID);
+
+  if (channel) {
+    const MembersReviews = [
+      "423232722534662176",
+      "636224287887589376",
+      "287779190613475339",
+      "334054676527841281",
+      "926266236491415552",
+    ];
+    let taggedString = "";
+
+    MembersReviews.forEach((userId) => {
+      taggedString += `<@${userId}> `;
+    });
+
+    if (event.action === "opened") {
+      const pr = event.pull_request;
+      const message = `New pull request opened: ${pr.title} by ${pr.user.login}\n ${taggedString} \n${pr.html_url}`;
+      channel.send(message).then((msg) => {
+        messageID = msg.id;
+      });
+    } else if (event.action === "reopened") {
+      const pr = event.pull_request;
+      const message = `Pull request reopened: ${pr.title} by ${pr.user.login}\n ${taggedString} \n${pr.html_url}`;
+      channel.send(message).then((msg) => {
+        messageID = msg.id;
+      });
+    } else if (event.action === "closed") {
+      try {
+        deleteMessage();
+      } catch (error) {
+        return res.status(500).send("Failed to delete message!");
+      }
+    }
+    res.status(200).send("Received!");
+  } else {
+    console.error("The channel does not exist!");
+    return res.status(500).send("Failed to send message!");
+  }
+});
+
+const http = require("http");
+http.createServer(app).listen(7777, () => {
+  console.log("Server running at http://localhost:7777/");
+});
+
+function deleteMessage() {
+  const channel = client.channels.cache.get(process.env.DISCORD_CHANNEL_ID);
+  if (channel) {
+    const fetchedMessage = channel.messages.cache.get(messageID);
+    if (fetchedMessage) {
+      fetchedMessage.delete().then(() => console.log("Message deleted."));
+    } else {
+      console.error("Message not found in cache.");
+    }
+  } else {
+    console.error("The channel does not exist!");
+  }
+}
